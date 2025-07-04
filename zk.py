@@ -7,6 +7,7 @@ from soldier import Soldier
 from bullet import Bullet
 from zombie import Zombie
 from game_stats import GameStats
+from button import Button
 
 
 class ZombieKiller:
@@ -34,6 +35,9 @@ class ZombieKiller:
         self.stats = GameStats(self)
 
         self._create_crowd()
+
+        self.play_button = Button(self, "Play")
+
         
     
 
@@ -41,9 +45,15 @@ class ZombieKiller:
         while True:
             self._check_events()
             self.soldier.update()
-            self._check_crowd_edges()
-            self._update_zombies()
-            self._update_bullets()
+
+            if self.stats.game_active:
+                self._check_crowd_edges()
+                self._update_zombies()
+                self._update_bullets()
+            else:
+                self._return_soldier()
+                
+            
             self._update_screen()  
             
             
@@ -54,13 +64,16 @@ class ZombieKiller:
             if event.type == pygame.QUIT:
                 sys.exit()
 
-
             elif event.type == pygame.KEYDOWN:
                 print(event.key)
                 self._check_keydown_events(event)
 
             elif event.type == pygame.KEYUP:
                 self._check_keyup_events(event)
+
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                self._check_play_button(mouse_pos)
 
     def _check_keydown_events(self, event):
         """Обработка нажатий клавиш."""
@@ -197,7 +210,15 @@ class ZombieKiller:
 
         self.zombies.add(zombie)
 
-    
+    def _return_soldier(self):
+        """Возвращает солдата в начальное положение."""
+        self.soldier.rect.midleft = self.screen.get_rect().midleft  # Reset position
+        self.soldier.x = float(self.soldier.rect.x)
+        self.soldier.y = float(self.soldier.rect.y)
+        self.soldier.moving_right = False
+        self.soldier.moving_left = False
+        self.soldier.moving_up = False
+        self.soldier.moving_down = False
 
     def _update_screen(self):
         """Обновление экрана."""
@@ -210,6 +231,9 @@ class ZombieKiller:
         # Рисуем всех зомби вручную
         for zombie in self.zombies.sprites():
             zombie.draw()
+
+        if not self.stats.game_active:
+            self.play_button.draw_button()
 
 
         pygame.display.flip()
@@ -237,14 +261,18 @@ class ZombieKiller:
 
 
     def _soldier_hit(self):
-        """Обрабатывает столкновение корабля с пришельцем."""
-        self.stats.soldier_health -= 1
-        self.zombies.empty()
-        self.bullets.empty()
-        # Создание нового флота и размещение корабля в центре.
-        self._create_crowd()
-        # Пауза.
-        time.sleep(0.5)
+        if self.stats.soldier_health > 0:
+            """Обрабатывает столкновение корабля с пришельцем."""
+            self.stats.soldier_health -= 1
+            self.zombies.empty()
+            self.bullets.empty()
+            # Создание нового флота и размещение корабля в центре.
+            self._create_crowd()
+            self._return_soldier()
+            # Пауза.
+            time.sleep(0.5)
+        else:
+            self.stats.game_active = False
 
     def _check_zombies_end(self):
         """Проверяет, добрались ли пришельцы до нижнего края экрана."""
@@ -254,6 +282,11 @@ class ZombieKiller:
                 # Происходит то же, что при столкновении с кораблем.
                 self._soldier_hit()
                 break
+    
+    def _check_play_button(self, mouse_pos):
+        """Запускает новую игру при нажатии кнопки Play."""
+        if self.play_button.rect.collidepoint(mouse_pos):
+            self.stats.game_active = True
 
 
 zk = ZombieKiller()
