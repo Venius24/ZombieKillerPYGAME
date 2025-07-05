@@ -8,6 +8,7 @@ from bullet import Bullet
 from zombie import Zombie
 from game_stats import GameStats
 from button import Button
+from scoreboard import Scoreboard
 
 
 class ZombieKiller:
@@ -23,6 +24,8 @@ class ZombieKiller:
         self.soldier = Soldier(self)
         self.bullets = pygame.sprite.Group()
         self.zombies = pygame.sprite.Group()
+        self.stats = GameStats(self)
+        self.sb = Scoreboard(self)
 
         # ------------------------------------------------------------------
         # ВКЛАДКА 1.  Параметры «рандомизации»   ---------------------------
@@ -32,7 +35,6 @@ class ZombieKiller:
         self.jitter_y     = 0.30   # смещение до 30 % высоты
         self.seed        = None   # поставь число, чтобы «запомнить» генерацию
 
-        self.stats = GameStats(self)
 
         self._create_crowd()
 
@@ -50,8 +52,6 @@ class ZombieKiller:
                 self._check_crowd_edges()
                 self._update_zombies()
                 self._update_bullets()
-            else:
-                self._return_soldier()
                 
             
             self._update_screen()  
@@ -132,6 +132,17 @@ class ZombieKiller:
           # Уничтожение существующих снарядов и создание нового флота.
             self.bullets.empty()
             self._create_crowd()
+            self.settings.increase_speed()
+
+            # Увеличение уровня.
+            self.stats.level += 1
+            self.sb.prep_level()
+
+        if collisions:
+            for zombies in collisions.values():
+                self.stats.score += self.settings.zombie_points * len(zombies)
+            self.sb.prep_score()
+            self.sb.check_high_score()
 
     # ------------------------------------------------------------------
     # ВКЛАДКА 2.  Создание толпы   -------------------------------w------
@@ -232,6 +243,8 @@ class ZombieKiller:
         for zombie in self.zombies.sprites():
             zombie.draw()
 
+        self.sb.show_score()
+
         if not self.stats.game_active:
             self.play_button.draw_button()
 
@@ -249,7 +262,7 @@ class ZombieKiller:
     def _change_zombie_direction(self):
         """Опускает весь флот и меняет направление флота."""
         self.settings.zombie_direction *= -1
-        print(f"Zombie direction changed to: {self.settings.zombie_direction}")
+        #print(f"Zombie direction changed to: {self.settings.zombie_direction}")
 
     def _update_zombies(self):
         self.zombies.update()
@@ -264,6 +277,7 @@ class ZombieKiller:
         if self.stats.soldier_health > 0:
             """Обрабатывает столкновение корабля с пришельцем."""
             self.stats.soldier_health -= 1
+            self.sb.prep_soldiers()
             self.zombies.empty()
             self.bullets.empty()
             # Создание нового флота и размещение корабля в центре.
@@ -273,6 +287,7 @@ class ZombieKiller:
             time.sleep(0.5)
         else:
             self.stats.game_active = False
+            pygame.mouse.set_visible(True)
 
     def _check_zombies_end(self):
         """Проверяет, добрались ли пришельцы до нижнего края экрана."""
@@ -285,9 +300,26 @@ class ZombieKiller:
     
     def _check_play_button(self, mouse_pos):
         """Запускает новую игру при нажатии кнопки Play."""
-        if self.play_button.rect.collidepoint(mouse_pos):
+        button_clicked = self.play_button.rect.collidepoint(mouse_pos)
+        if button_clicked and not self.stats.game_active:
+            self.settings.initialize_dynamic_settings()
+            # Указатель мыши скрывается.
+            pygame.mouse.set_visible(False)
+
+            self.stats.reset_stats()
             self.stats.game_active = True
+            self.sb.prep_score()
+            self.sb.prep_level()
+            self.sb.prep_soldiers()
+
+            # Очистка
+            self.zombies.empty()
+            self.bullets.empty()
+
+            self._create_crowd()
+            self._return_soldier()
 
 
-zk = ZombieKiller()
-zk.run_game()
+if __name__ == "__main__":
+    zk = ZombieKiller()
+    zk.run_game()
